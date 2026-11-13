@@ -63,7 +63,7 @@
     field.keyboardType = keyboard;
     field.returnKeyType = UIReturnKeyDone;
     field.delegate = self;
-    field.heightAnchor.constraintEqualToConstant(44.0).active = YES;
+    [field.heightAnchor constraintEqualToConstant:44.0].active = YES;
     return field;
 }
 
@@ -157,7 +157,7 @@
 
     UIView *separator = [[UIView alloc] init];
     separator.backgroundColor = UIColor.separatorColor;
-    separator.heightAnchor.constraintEqualToConstant(1.0).active = YES;
+    [separator.heightAnchor constraintEqualToConstant:1.0].active = YES;
     [stack addArrangedSubview:separator];
 
     UILabel *privacy = [self makeLabel:@"隐私：计划保存在本机；不收集账号密码、身份证号或支付信息，也不连接或修改大麦服务。"
@@ -176,7 +176,7 @@
     [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
     button.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
     [button addTarget:self action:selector forControlEvents:UIControlEventTouchUpInside];
-    button.heightAnchor.constraintGreaterThanOrEqualToConstant(48.0).active = YES;
+    [button.heightAnchor constraintGreaterThanOrEqualToConstant:48.0].active = YES;
     return button;
 }
 
