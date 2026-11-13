@@ -1,0 +1,14 @@
+#!/bin/sh
+# Register the rootless app with SpringBoard after dpkg finishes installing it.
+APP="/var/jb/Applications/DamaiPocket.app"
+UICACHE="/var/jb/usr/bin/uicache"
+
+if [ -d "$APP" ]; then
+    if [ -x "$UICACHE" ]; then
+        "$UICACHE" -p "$APP" || "$UICACHE" -a
+    elif command -v uicache >/dev/null 2>&1; then
+        uicache -p "$APP" || uicache -a
+    fi
+fi
+
+exit 0
