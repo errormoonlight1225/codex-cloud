@@ -1,0 +1,9 @@
+Package: com.damaipocket.app
+Name: DamaiPocket
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Standalone ticket-sale reminder and official-link launcher.
+Maintainer: DamaiPocket contributors
+Author: DamaiPocket contributors
+Section: Applications
+Depends: firmware (>= 14.0)
