@@ -92,7 +92,7 @@
         [stack.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor constant:-40.0]
     ]];
 
-    UILabel *title = [self makeLabel:@"开售提醒与购票准备" size:25.0 weight:UIFontWeightBold];
+    UILabel *title = [self makeLabel:@"DamaiPocket 购票计划" size:25.0 weight:UIFontWeightBold];
     [stack addArrangedSubview:title];
     UILabel *subtitle = [self makeLabel:@"保存演出信息、设置开售提醒，到点后打开大麦官方页面。此工具不接管购票流程。"
                                      size:14.0 weight:UIFontWeightRegular];
