@@ -12,7 +12,7 @@
                                                           object:nil
                                                            queue:[NSOperationQueue mainQueue]
                                                       usingBlock:^(NSNotification *note) {
-            NSLog(@"[DamaiPocket] Damai became active; passive probe only.");
+            NSLog(@"[DamaiPocket] Damai became active; passive probe only; build 0.1.1.");
         }];
     }
 }
