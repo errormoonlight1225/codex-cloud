@@ -43,17 +43,17 @@
  NSString *price=[self.priceField.text stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
  NSInteger qty=MAX(1,MIN(6,self.quantityField.text.integerValue));
  NSString *js=[NSString stringWithFormat:
- @"(()=>{const S='%@',P='%@',Q=%ld;const T=e=>(e.innerText||e.textContent||'').replace(/\\s+/g,' ').trim();const V=e=>e&&e.getBoundingClientRect().width>0;const C=e=>{e.scrollIntoView({block:'center'});e.click()};const B=T(document.body);"
- "if(/验证码|滑块|安全验证/.test(B))return '需要手动完成安全验证';"
+ @"(()=>{const S='%@',P='%@',Q=%ld;const T=e=>(e.innerText||e.textContent||'').replace(/\\s+/g,' ').trim();const V=e=>e&&e.getBoundingClientRect().width>0;const C=e=>{e.scrollIntoView({block:'center'});e.click()};const B=T(document.body);const R=()=>{window.__dpPoll=(window.__dpPoll||0)+1;if(window.__dpPoll%8===0){location.reload();return '刷新页面等待库存'}return '等待库存变化'};"
+ "if(/验证码|滑块|安全验证/.test(B))return '需要手动完成安全验证';if(/选座购买|选择座位/.test(document.title+' '+B))return '需要手动完成选座';"
  "if(/订单确认|确认订单/.test(document.title+' '+B)){let b=[...document.querySelectorAll('button,a,[role=button]')].find(e=>V(e)&&/提交订单|确认提交/.test(T(e)));if(b){C(b);return '订单已提交，等待支付';}return '已进入订单确认页';}"
  "let ts=document.querySelector('.sku-times-card'),ps=document.querySelector('.sku-tickets-card');"
- "if(ts||ps){if(ts){let e=[...ts.querySelectorAll('.bui-dm-sku-card-item')].find(x=>T(x).includes(S)&&!/(无票|缺货|售罄)/.test(T(x)));if(!e)return '等待目标场次有票';if(!/active|selected/.test(e.className+' '+e.getAttribute('aria-selected'))){C(e);return '已选场次';}}"
- "if(ps){let e=[...ps.querySelectorAll('.item-content')].find(x=>T(x).includes(P)&&!/(无票|缺货|售罄)/.test(T(x)));if(!e)return '等待目标票档有票';if(!/active|selected/.test(e.className+' '+e.getAttribute('aria-selected'))){C(e);return '已选票档';}}"
+ "if(ts||ps){if(ts){let e=[...ts.querySelectorAll('.bui-dm-sku-card-item')].find(x=>T(x).includes(S)&&!/(无票|缺货|售罄)/.test(T(x)));if(!e)return R();if(!/active|selected/.test(e.className+' '+e.getAttribute('aria-selected'))){C(e);return '已选场次';}}"
+ "if(ps){let e=[...ps.querySelectorAll('.item-content')].find(x=>T(x).includes(P)&&!/(无票|缺货|售罄)/.test(T(x)));if(!e)return R();if(!/active|selected/.test(e.className+' '+e.getAttribute('aria-selected'))){C(e);return '已选票档';}}"
  "let plus=document.querySelectorAll('.number-edit-bg');if(plus.length>1){let n=document.querySelector('.number-edit-num'),v=parseInt(n?T(n):'1')||1;if(v<Q){C(plus[1]);return '设置数量 '+(v+1)+'/'+Q;}}"
  "let ok=document.querySelector('.bui-btn-contained');if(ok&&V(ok)&&!ok.disabled){C(ok);return '确认票档数量并进入订单';}return '选票页检测中';}"
- "let buy=[...document.querySelectorAll('.buy__button__text,button,a,[role=button]')].find(e=>V(e)&&/立即预订|立即购买|选座购买/.test(T(e)));if(buy){C(buy);return '发现可购买入口，进入选票页';}return '等待开售或库存变化';})()",
+ "let buy=[...document.querySelectorAll('.buy__button__text,button,a,[role=button]')].find(e=>V(e)&&/立即预订|立即购买|选座购买/.test(T(e)));if(buy){C(buy);return '发现可购买入口，进入选票页';}return R();})()",
  session,price,(long)qty];
- [self.webView evaluateJavaScript:js completionHandler:^(id v,NSError *e){ if(!self.running)return; NSString *m=e?e.localizedDescription:([v isKindOfClass:NSString.class]?v:@"检测中"); dispatch_async(dispatch_get_main_queue(),^{self.statusLabel.text=[@"状态：" stringByAppendingString:m];}); if([m containsString:@"订单已提交"]||[m containsString:@"安全验证"])[self stop]; }];
+ [self.webView evaluateJavaScript:js completionHandler:^(id v,NSError *e){ if(!self.running)return; NSString *m=e?e.localizedDescription:([v isKindOfClass:NSString.class]?v:@"检测中"); dispatch_async(dispatch_get_main_queue(),^{self.statusLabel.text=[@"状态：" stringByAppendingString:m];}); if([m containsString:@"订单已提交"]||[m containsString:@"安全验证"]||[m containsString:@"手动完成选座"])[self stop]; }];
 }
 - (void)dealloc { [self.timer invalidate]; }
 @end
