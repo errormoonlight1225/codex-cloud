@@ -1,11 +1,11 @@
-name: Build Rootless DEB
+name: Build DamaiPocket Rootless App
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - "DamaiPocketTweak/**"
+      - "DamaiPocketApp/**"
       - ".github/workflows/build-deb.yml"
 
 permissions:
@@ -33,23 +33,25 @@ jobs:
           mkdir -p "$HOME/theos/sdks"
           cp -R "$RUNNER_TEMP/theos-sdks/iPhoneOS16.5.sdk" "$HOME/theos/sdks/"
 
-      - name: Build Rootless package
-        working-directory: DamaiPocketTweak
+      - name: Build rootless app package
+        working-directory: DamaiPocketApp
         run: |
           export THEOS="$HOME/theos"
           make clean
           make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
 
-      - name: Verify DEB
+      - name: Verify DEB and app bundle
         run: |
           set -e
-          ls -lah DamaiPocketTweak/packages/*.deb
-          for f in DamaiPocketTweak/packages/*.deb; do dpkg-deb -I "$f"; done
+          DEB="$(find DamaiPocketApp/packages -maxdepth 1 -name '*.deb' -print -quit)"
+          test -n "$DEB"
+          dpkg-deb -I "$DEB"
+          dpkg-deb -c "$DEB" | grep -E 'DamaiPocket\.app/(Info\.plist|DamaiPocket)$'
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
           name: DamaiPocket-Rootless-DEB
-          path: DamaiPocketTweak/packages/*.deb
+          path: DamaiPocketApp/packages/*.deb
           if-no-files-found: error
           retention-days: 30
