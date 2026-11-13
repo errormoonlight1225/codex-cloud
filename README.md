@@ -1,39 +1,38 @@
 # DamaiPocket
 
-DamaiPocket is a rootless on-device UI assistant for the official Damai iOS app. It targets the Dopamine / ElleKit jailbreak environment and is built as a Theos DEB package.
+DamaiPocket is a standalone, non-invasive iOS ticket-sale preparation utility. It does not inject into, automate, or modify the official Damai app.
 
-## Target device
+## Device target
 
-- iPad 8 (A12, arm64e-capable)
+- iPad 8
 - iOS 16.3
-- Dopamine rootless jailbreak / ElleKit
-- Damai app bundle filter: **cn.damai.iphone**
+- Dopamine rootless jailbreak
+- Package format: rootless DEB
+- Minimum iOS version: 14.0
 
-## What 0.2.0 does
+## Features
 
-- Injects only into the official Damai app.
-- Adds an on-screen DamaiPocket control panel.
-- Saves sale time, session keyword, and ticket-price keyword locally in the app sandbox.
-- Starts a local countdown and scans the current visible UIKit view tree.
-- Can tap a visible purchase entry or a visible option matching the user's configured session / price text.
-- Stops when it detects queueing, CAPTCHA, identity/security verification, rate-limit warnings, or an order/payment submission step.
-- Does not send ticketing network requests, reverse private endpoints, replay traffic, auto-solve CAPTCHA, bypass queues, or submit/pay an order.
+- Save an event name, city / venue, session, price, and planned ticket quantity.
+- Live sale countdown using the device's local clock.
+- Schedule local notifications for 10 minutes before, 1 minute before, and the sale time.
+- Open a pasted HTTPS event link on the official damai.cn domain. If no link is supplied, open the official Damai website.
+- Keep the plan locally in the app sandbox.
 
-## Important limits
+## Boundaries
 
-This build is a UI-assisted prototype, not a guarantee of ticket availability or purchase success. Damai can change its view hierarchy and labels at any time; some controls may not expose accessible text, so automatic selection may not work on every app version. The user must remain in the official app, check quantity and attendee details, and manually confirm the order and payment. Do not use it for bulk purchasing or resale.
+This is a reminder and quick-launch utility, not an auto-purchaser. It does not connect to Damai APIs, inspect app internals, inject code, tap purchase controls, bypass queues or verification, store account credentials, submit orders, or make payments. After the reminder, complete the transaction yourself in the official Damai app.
 
-## Build with GitHub Actions
+## GitHub Actions build
 
-1. Open **Actions** in the repository.
-2. Select **Build Rootless DEB**.
-3. Run the workflow manually, or push changes under **DamaiPocketTweak/**.
-4. Download the **DamaiPocket-Rootless-DEB** artifact from the successful run.
+1. Open the repository's **Actions** tab.
+2. Choose **Build DamaiPocket Rootless App**.
+3. Run the workflow, or push a change under **DamaiPocketApp/**.
+4. Download the **DamaiPocket-Rootless-DEB** artifact from a successful run.
 
-The build uses Theos, the iPhoneOS 16.5 SDK, and the rootless package scheme. The 16.5 SDK is used to compile; the deployment target remains iOS 14.0, so the package is intended to run on iOS 16.3.
+The workflow builds with Theos and the iPhoneOS 16.5 SDK. The app deployment target is iOS 14.0, and the package is built with Theos' rootless scheme.
 
 ## Install
 
-Transfer the generated DEB to the jailbroken iPad and install it with a rootless-compatible package manager (Sileo/Zebra) or dpkg -i. Then respring or restart the Damai app. Open Damai and tap the floating **DamaiPocket** button.
+Download the DEB artifact to the iPad and install it using Sileo or Zebra. After installation, DamaiPocket appears as a normal standalone app. Launch it, save the event plan, grant notification permission, and paste the official event URL.
 
-Remove the package from your package manager to uninstall it.
+No ElleKit tweak injection or changes to the Damai app are required.
