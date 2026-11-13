@@ -1,0 +1,9 @@
+Package: com.damaipocket.tweak
+Name: DamaiPocket Tweak
+Version: 0.1.1
+Architecture: iphoneos-arm
+Description: Rootless passive integration probe for Damai iOS app.
+Maintainer: DamaiPocket contributors
+Author: DamaiPocket contributors
+Section: Tweaks
+Depends: firmware (>= 14.0), ellekit
