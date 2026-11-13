@@ -1,0 +1,55 @@
+name: Build Rootless DEB
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "DamaiPocketTweak/**"
+      - ".github/workflows/build-deb.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install ldid
+
+      - name: Install Theos
+        run: |
+          git clone --depth 1 --recursive https://github.com/theos/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Install iPhoneOS 16.5 SDK
+        run: |
+          git clone --depth 1 https://github.com/theos/sdks.git "$RUNNER_TEMP/theos-sdks"
+          test -d "$RUNNER_TEMP/theos-sdks/iPhoneOS16.5.sdk"
+          mkdir -p "$HOME/theos/sdks"
+          cp -R "$RUNNER_TEMP/theos-sdks/iPhoneOS16.5.sdk" "$HOME/theos/sdks/"
+
+      - name: Build Rootless package
+        working-directory: DamaiPocketTweak
+        run: |
+          export THEOS="$HOME/theos"
+          make clean
+          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+
+      - name: Verify DEB
+        run: |
+          set -e
+          ls -lah DamaiPocketTweak/packages/*.deb
+          for f in DamaiPocketTweak/packages/*.deb; do dpkg-deb -I "$f"; done
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DamaiPocket-Rootless-DEB
+          path: DamaiPocketTweak/packages/*.deb
+          if-no-files-found: error
+          retention-days: 30
