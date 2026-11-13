@@ -27,7 +27,9 @@ This is a reminder and quick-launch utility, not an auto-purchaser. It does not 
 1. Open the repository's **Actions** tab.
 2. Choose **Build DamaiPocket Rootless App**.
 3. Run the workflow, or push a change under **DamaiPocketApp/**.
-4. Download the **DamaiPocket-Rootless-DEB** artifact from a successful run.
+4. Download the **DamaiPocket-Rootless-DEB** artifact from the newest successful run of that workflow.
+
+**Important:** Older workflow runs contain an obsolete injection-based prototype. Do not install artifacts from those older runs. Only use the artifact produced by **Build DamaiPocket Rootless App** after it succeeds.
 
 The workflow builds with Theos and the iPhoneOS 16.5 SDK. The app deployment target is iOS 14.0, and the package is built with Theos' rootless scheme.
 
