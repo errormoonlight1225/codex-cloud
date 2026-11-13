@@ -6,6 +6,6 @@ include $(THEOS)/makefiles/common.mk
 APPLICATION_NAME = DamaiPocket
 DamaiPocket_FILES = main.m DPAppDelegate.m DPViewController.m
 DamaiPocket_CFLAGS = -fobjc-arc
-DamaiPocket_FRAMEWORKS = UIKit UserNotifications
+DamaiPocket_FRAMEWORKS = UIKit WebKit
 
 include $(THEOS_MAKE_PATH)/application.mk
