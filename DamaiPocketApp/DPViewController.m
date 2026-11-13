@@ -1,331 +1,59 @@
 #import "DPViewController.h"
-#import <UserNotifications/UserNotifications.h>
+#import <WebKit/WebKit.h>
 
 @interface DPViewController ()
-@property (nonatomic, strong) UITextField *eventField;
-@property (nonatomic, strong) UITextField *cityField;
-@property (nonatomic, strong) UITextField *sessionField;
-@property (nonatomic, strong) UITextField *priceField;
-@property (nonatomic, strong) UITextField *quantityField;
-@property (nonatomic, strong) UITextField *linkField;
-@property (nonatomic, strong) UIDatePicker *salePicker;
-@property (nonatomic, strong) UILabel *countdownLabel;
-@property (nonatomic, strong) UILabel *statusLabel;
-@property (nonatomic, strong) NSTimer *countdownTimer;
+@property(nonatomic,strong) UITextField *urlField,*sessionField,*priceField,*quantityField;
+@property(nonatomic,strong) WKWebView *webView;
+@property(nonatomic,strong) UILabel *statusLabel;
+@property(nonatomic,strong) NSTimer *timer;
+@property(nonatomic,strong) UIButton *startButton;
+@property(nonatomic,assign) BOOL running;
 @end
 
 @implementation DPViewController
-
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    self.view.backgroundColor = UIColor.systemGroupedBackgroundColor;
-    self.title = @"DamaiPocket";
-    [self buildInterface];
-    [self loadPlan];
-    [self updateCountdown];
+- (void)viewDidLoad { [super viewDidLoad]; self.title=@"DamaiPocket 抢票"; self.view.backgroundColor=UIColor.systemBackgroundColor; [self buildUI]; }
+- (UITextField *)field:(NSString *)p type:(UIKeyboardType)t { UITextField *v=[UITextField new]; v.placeholder=p; v.borderStyle=UITextBorderStyleRoundedRect; v.backgroundColor=UIColor.secondarySystemBackgroundColor; v.font=[UIFont systemFontOfSize:15]; v.keyboardType=t; v.autocorrectionType=UITextAutocorrectionTypeNo; v.autocapitalizationType=UITextAutocapitalizationTypeNone; v.delegate=self; [v.heightAnchor constraintEqualToConstant:40].active=YES; return v; }
+- (UIButton *)button:(NSString *)s sel:(SEL)sel color:(UIColor *)c { UIButton *b=[UIButton buttonWithType:UIButtonTypeSystem]; [b setTitle:s forState:UIControlStateNormal]; [b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal]; b.backgroundColor=c; b.layer.cornerRadius=9; b.titleLabel.font=[UIFont systemFontOfSize:14 weight:UIFontWeightSemibold]; [b addTarget:self action:sel forControlEvents:UIControlEventTouchUpInside]; [b.heightAnchor constraintEqualToConstant:42].active=YES; return b; }
+- (void)buildUI {
+ UIStackView *s=[UIStackView new]; s.axis=UILayoutConstraintAxisVertical; s.spacing=7; s.translatesAutoresizingMaskIntoConstraints=NO; [self.view addSubview:s];
+ [NSLayoutConstraint activateConstraints:@[[s.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor constant:10],[s.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor constant:-10],[s.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:6],[s.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-6]]];
+ UILabel *h=[UILabel new]; h.text=@"网页登录大麦，自动匹配场次/票档、设置数量并提交订单。验证码、选座和付款由你本人完成。"; h.numberOfLines=2; h.font=[UIFont systemFontOfSize:12]; h.textColor=UIColor.secondaryLabelColor; [s addArrangedSubview:h];
+ self.urlField=[self field:@"大麦演出详情页 HTTPS 链接" type:UIKeyboardTypeURL];
+ self.sessionField=[self field:@"场次关键词，例如 11月20日 19:30" type:UIKeyboardTypeDefault];
+ self.priceField=[self field:@"票档关键词，例如 680元" type:UIKeyboardTypeDefault];
+ self.quantityField=[self field:@"数量 1-6" type:UIKeyboardTypeNumberPad]; self.quantityField.text=@"1";
+ [s addArrangedSubview:self.urlField]; [s addArrangedSubview:self.sessionField]; [s addArrangedSubview:self.priceField]; [s addArrangedSubview:self.quantityField];
+ UIStackView *row=[UIStackView new]; row.axis=UILayoutConstraintAxisHorizontal; row.spacing=6;
+ [row addArrangedSubview:[self button:@"打开演出页" sel:@selector(openEvent) color:UIColor.systemBlueColor]];
+ self.startButton=[self button:@"开始抢票" sel:@selector(start) color:UIColor.systemRedColor]; [row addArrangedSubview:self.startButton];
+ [row addArrangedSubview:[self button:@"停止" sel:@selector(stop) color:UIColor.darkGrayColor]]; [s addArrangedSubview:row];
+ self.statusLabel=[UILabel new]; self.statusLabel.text=@"状态：先在网页内登录大麦账号。"; self.statusLabel.font=[UIFont systemFontOfSize:12]; self.statusLabel.numberOfLines=2; self.statusLabel.textColor=UIColor.systemOrangeColor; [s addArrangedSubview:self.statusLabel];
+ WKWebViewConfiguration *c=[WKWebViewConfiguration new]; c.websiteDataStore=WKWebsiteDataStore.defaultDataStore;
+ self.webView=[[WKWebView alloc] initWithFrame:CGRectZero configuration:c]; self.webView.translatesAutoresizingMaskIntoConstraints=NO; self.webView.allowsBackForwardNavigationGestures=YES; [s addArrangedSubview:self.webView]; [self.webView.heightAnchor constraintGreaterThanOrEqualToConstant:220].active=YES;
+ [self.webView loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"https://www.damai.cn/"]]];
 }
-
-- (void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:animated];
-    [self.countdownTimer invalidate];
-    self.countdownTimer = [NSTimer timerWithTimeInterval:1.0
-                                                  target:self
-                                                selector:@selector(updateCountdown)
-                                                userInfo:nil
-                                                 repeats:YES];
-    [[NSRunLoop mainRunLoop] addTimer:self.countdownTimer forMode:NSRunLoopCommonModes];
+- (BOOL)textFieldShouldReturn:(UITextField *)t { [t resignFirstResponder]; return YES; }
+- (BOOL)validURL:(NSString *)u { NSURLComponents *c=[NSURLComponents componentsWithString:u]; NSString *h=c.host.lowercaseString; return [c.scheme.lowercaseString isEqual:@"https"] && ([h isEqual:@"damai.cn"] || [h hasSuffix:@".damai.cn"]); }
+- (void)openEvent { [self.view endEditing:YES]; NSString *u=self.urlField.text ?: @""; if(![self validURL:u]) { self.statusLabel.text=@"状态：请输入有效的大麦 HTTPS 链接"; return; } [self.webView loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:u]]]; self.statusLabel.text=@"状态：打开页面；首次使用请在网页内扫码登录。"; }
+- (void)start { [self.view endEditing:YES]; if(![self validURL:self.webView.URL.absoluteString ?: @""] || !self.sessionField.text.length || !self.priceField.text.length) { self.statusLabel.text=@"状态：打开演出页并填写场次、票档关键词。"; return; } NSInteger q=self.quantityField.text.integerValue; if(q<1||q>6) { self.statusLabel.text=@"状态：数量范围为 1-6"; return; } self.running=YES; [self.startButton setTitle:@"抢票运行中" forState:UIControlStateNormal]; self.statusLabel.text=@"状态：开始检测库存…"; [self.timer invalidate]; self.timer=[NSTimer scheduledTimerWithTimeInterval:0.5 target:self selector:@selector(tick) userInfo:nil repeats:YES]; [self tick]; }
+- (void)stop { self.running=NO; [self.timer invalidate]; self.timer=nil; [self.startButton setTitle:@"开始抢票" forState:UIControlStateNormal]; self.statusLabel.text=@"状态：已停止"; }
+- (void)tick {
+ if(!self.running)return;
+ NSString *session=[self.sessionField.text stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
+ NSString *price=[self.priceField.text stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
+ NSInteger qty=MAX(1,MIN(6,self.quantityField.text.integerValue));
+ NSString *js=[NSString stringWithFormat:
+ @"(()=>{const S='%@',P='%@',Q=%ld;const T=e=>(e.innerText||e.textContent||'').replace(/\\s+/g,' ').trim();const V=e=>e&&e.getBoundingClientRect().width>0;const C=e=>{e.scrollIntoView({block:'center'});e.click()};const B=T(document.body);"
+ "if(/验证码|滑块|安全验证/.test(B))return '需要手动完成安全验证';"
+ "if(/订单确认|确认订单/.test(document.title+' '+B)){let b=[...document.querySelectorAll('button,a,[role=button]')].find(e=>V(e)&&/提交订单|确认提交/.test(T(e)));if(b){C(b);return '订单已提交，等待支付';}return '已进入订单确认页';}"
+ "let ts=document.querySelector('.sku-times-card'),ps=document.querySelector('.sku-tickets-card');"
+ "if(ts||ps){if(ts){let e=[...ts.querySelectorAll('.bui-dm-sku-card-item')].find(x=>T(x).includes(S)&&!/(无票|缺货|售罄)/.test(T(x)));if(!e)return '等待目标场次有票';if(!/active|selected/.test(e.className+' '+e.getAttribute('aria-selected'))){C(e);return '已选场次';}}"
+ "if(ps){let e=[...ps.querySelectorAll('.item-content')].find(x=>T(x).includes(P)&&!/(无票|缺货|售罄)/.test(T(x)));if(!e)return '等待目标票档有票';if(!/active|selected/.test(e.className+' '+e.getAttribute('aria-selected'))){C(e);return '已选票档';}}"
+ "let plus=document.querySelectorAll('.number-edit-bg');if(plus.length>1){let n=document.querySelector('.number-edit-num'),v=parseInt(n?T(n):'1')||1;if(v<Q){C(plus[1]);return '设置数量 '+(v+1)+'/'+Q;}}"
+ "let ok=document.querySelector('.bui-btn-contained');if(ok&&V(ok)&&!ok.disabled){C(ok);return '确认票档数量并进入订单';}return '选票页检测中';}"
+ "let buy=[...document.querySelectorAll('.buy__button__text,button,a,[role=button]')].find(e=>V(e)&&/立即预订|立即购买|选座购买/.test(T(e)));if(buy){C(buy);return '发现可购买入口，进入选票页';}return '等待开售或库存变化';})()",
+ session,price,(long)qty];
+ [self.webView evaluateJavaScript:js completionHandler:^(id v,NSError *e){ if(!self.running)return; NSString *m=e?e.localizedDescription:([v isKindOfClass:NSString.class]?v:@"检测中"); dispatch_async(dispatch_get_main_queue(),^{self.statusLabel.text=[@"状态：" stringByAppendingString:m];}); if([m containsString:@"订单已提交"]||[m containsString:@"安全验证"])[self stop]; }];
 }
-
-- (void)viewWillDisappear:(BOOL)animated {
-    [super viewWillDisappear:animated];
-    [self.countdownTimer invalidate];
-    self.countdownTimer = nil;
-}
-
-- (UILabel *)makeLabel:(NSString *)text size:(CGFloat)size weight:(UIFontWeight)weight {
-    UILabel *label = [[UILabel alloc] init];
-    label.text = text;
-    label.font = [UIFont systemFontOfSize:size weight:weight];
-    label.textColor = UIColor.labelColor;
-    label.numberOfLines = 0;
-    return label;
-}
-
-- (UITextField *)makeField:(NSString *)placeholder keyboard:(UIKeyboardType)keyboard {
-    UITextField *field = [[UITextField alloc] init];
-    field.placeholder = placeholder;
-    field.borderStyle = UITextBorderStyleRoundedRect;
-    field.backgroundColor = UIColor.secondarySystemGroupedBackgroundColor;
-    field.font = [UIFont systemFontOfSize:16.0];
-    field.clearButtonMode = UITextFieldViewModeWhileEditing;
-    field.autocorrectionType = UITextAutocorrectionTypeNo;
-    field.autocapitalizationType = UITextAutocapitalizationTypeNone;
-    field.keyboardType = keyboard;
-    field.returnKeyType = UIReturnKeyDone;
-    field.delegate = self;
-    [field.heightAnchor constraintEqualToConstant:44.0].active = YES;
-    return field;
-}
-
-- (void)buildInterface {
-    UIScrollView *scroll = [[UIScrollView alloc] init];
-    scroll.translatesAutoresizingMaskIntoConstraints = NO;
-    scroll.alwaysBounceVertical = YES;
-    [self.view addSubview:scroll];
-
-    UIStackView *stack = [[UIStackView alloc] init];
-    stack.axis = UILayoutConstraintAxisVertical;
-    stack.spacing = 12.0;
-    stack.alignment = UIStackViewAlignmentFill;
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    [scroll addSubview:stack];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [scroll.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor],
-        [scroll.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor],
-        [scroll.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
-        [scroll.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor],
-        [stack.leadingAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.leadingAnchor constant:20.0],
-        [stack.trailingAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.trailingAnchor constant:-20.0],
-        [stack.topAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.topAnchor constant:18.0],
-        [stack.bottomAnchor constraintEqualToAnchor:scroll.contentLayoutGuide.bottomAnchor constant:-28.0],
-        [stack.widthAnchor constraintEqualToAnchor:scroll.frameLayoutGuide.widthAnchor constant:-40.0]
-    ]];
-
-    UILabel *title = [self makeLabel:@"DamaiPocket 购票计划" size:25.0 weight:UIFontWeightBold];
-    [stack addArrangedSubview:title];
-    UILabel *subtitle = [self makeLabel:@"保存演出信息、设置开售提醒，到点后打开大麦官方页面。此工具不接管购票流程。"
-                                     size:14.0 weight:UIFontWeightRegular];
-    subtitle.textColor = UIColor.secondaryLabelColor;
-    [stack addArrangedSubview:subtitle];
-
-    [stack addArrangedSubview:[self makeLabel:@"演出名称" size:14 weight:UIFontWeightSemibold]];
-    self.eventField = [self makeField:@"例如：演出 / 音乐节名称" keyboard:UIKeyboardTypeDefault];
-    [stack addArrangedSubview:self.eventField];
-
-    [stack addArrangedSubview:[self makeLabel:@"城市 / 场馆" size:14 weight:UIFontWeightSemibold]];
-    self.cityField = [self makeField:@"例如：上海 · 梅赛德斯奔驰文化中心" keyboard:UIKeyboardTypeDefault];
-    [stack addArrangedSubview:self.cityField];
-
-    [stack addArrangedSubview:[self makeLabel:@"场次 / 日期" size:14 weight:UIFontWeightSemibold]];
-    self.sessionField = [self makeField:@"例如：11月20日 19:30" keyboard:UIKeyboardTypeDefault];
-    [stack addArrangedSubview:self.sessionField];
-
-    [stack addArrangedSubview:[self makeLabel:@"票价 / 数量" size:14 weight:UIFontWeightSemibold]];
-    UIStackView *ticketRow = [[UIStackView alloc] init];
-    ticketRow.axis = UILayoutConstraintAxisHorizontal;
-    ticketRow.spacing = 10.0;
-    ticketRow.distribution = UIStackViewDistributionFillEqually;
-    self.priceField = [self makeField:@"票价，例如 680" keyboard:UIKeyboardTypeDecimalPad];
-    self.quantityField = [self makeField:@"张数，例如 2" keyboard:UIKeyboardTypeNumberPad];
-    [ticketRow addArrangedSubview:self.priceField];
-    [ticketRow addArrangedSubview:self.quantityField];
-    [stack addArrangedSubview:ticketRow];
-
-    [stack addArrangedSubview:[self makeLabel:@"开售时间（设备本地时间）" size:14 weight:UIFontWeightSemibold]];
-    self.salePicker = [[UIDatePicker alloc] init];
-    self.salePicker.datePickerMode = UIDatePickerModeDateAndTime;
-    self.salePicker.minimumDate = [NSDate date];
-    if (@available(iOS 13.4, *)) {
-        self.salePicker.preferredDatePickerStyle = UIDatePickerStyleWheels;
-    }
-    [stack addArrangedSubview:self.salePicker];
-
-    self.countdownLabel = [self makeLabel:@"距离开售：--" size:19.0 weight:UIFontWeightBold];
-    self.countdownLabel.textColor = UIColor.systemRedColor;
-    [stack addArrangedSubview:self.countdownLabel];
-
-    [stack addArrangedSubview:[self makeLabel:@"大麦官方演出链接" size:14 weight:UIFontWeightSemibold]];
-    self.linkField = [self makeField:@"粘贴 https://...damai.cn/... 演出链接" keyboard:UIKeyboardTypeURL];
-    self.linkField.textContentType = UITextContentTypeURL;
-    [stack addArrangedSubview:self.linkField];
-
-    UIButton *saveButton = [self makeButton:@"保存计划并设置本地通知"
-                                      color:UIColor.systemBlueColor
-                                    action:@selector(savePlanAndSchedule)];
-    [stack addArrangedSubview:saveButton];
-
-    UIButton *openButton = [self makeButton:@"打开大麦官方购票页面"
-                                     color:UIColor.systemRedColor
-                                   action:@selector(openDamai)];
-    [stack addArrangedSubview:openButton];
-
-    self.statusLabel = [self makeLabel:@"提醒仅在本机触发。请提前在大麦官方 App 登录、添加观演人并检查支付方式。"
-                                    size:13.0 weight:UIFontWeightRegular];
-    self.statusLabel.textColor = UIColor.secondaryLabelColor;
-    [stack addArrangedSubview:self.statusLabel];
-
-    UIView *separator = [[UIView alloc] init];
-    separator.backgroundColor = UIColor.separatorColor;
-    [separator.heightAnchor constraintEqualToConstant:1.0].active = YES;
-    [stack addArrangedSubview:separator];
-
-    UILabel *privacy = [self makeLabel:@"隐私：计划保存在本机；不收集账号密码、身份证号或支付信息，也不连接或修改大麦服务。"
-                                     size:12.0 weight:UIFontWeightRegular];
-    privacy.textColor = UIColor.tertiaryLabelColor;
-    [stack addArrangedSubview:privacy];
-}
-
-- (UIButton *)makeButton:(NSString *)title color:(UIColor *)color action:(SEL)selector {
-    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-    button.translatesAutoresizingMaskIntoConstraints = NO;
-    button.backgroundColor = color;
-    button.layer.cornerRadius = 12.0;
-    button.contentEdgeInsets = UIEdgeInsetsMake(13, 16, 13, 16);
-    [button setTitle:title forState:UIControlStateNormal];
-    [button setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    button.titleLabel.font = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
-    [button addTarget:self action:selector forControlEvents:UIControlEventTouchUpInside];
-    [button.heightAnchor constraintGreaterThanOrEqualToConstant:48.0].active = YES;
-    return button;
-}
-
-- (BOOL)textFieldShouldReturn:(UITextField *)textField {
-    [textField resignFirstResponder];
-    return YES;
-}
-
-- (void)loadPlan {
-    NSDictionary *plan = [NSUserDefaults.standardUserDefaults dictionaryForKey:@"DPTSavedPlan"];
-    if (![plan isKindOfClass:[NSDictionary class]]) return;
-    self.eventField.text = plan[@"event"] ?: @"";
-    self.cityField.text = plan[@"city"] ?: @"";
-    self.sessionField.text = plan[@"session"] ?: @"";
-    self.priceField.text = plan[@"price"] ?: @"";
-    self.quantityField.text = plan[@"quantity"] ?: @"";
-    self.linkField.text = plan[@"link"] ?: @"";
-    NSDate *saleDate = plan[@"saleDate"];
-    if ([saleDate isKindOfClass:[NSDate class]] && [saleDate timeIntervalSinceNow] > 0) {
-        self.salePicker.date = saleDate;
-    }
-}
-
-- (NSDictionary *)currentPlan {
-    return @{
-        @"event": self.eventField.text ?: @"",
-        @"city": self.cityField.text ?: @"",
-        @"session": self.sessionField.text ?: @"",
-        @"price": self.priceField.text ?: @"",
-        @"quantity": self.quantityField.text ?: @"",
-        @"link": self.linkField.text ?: @"",
-        @"saleDate": self.salePicker.date
-    };
-}
-
-- (void)savePlanAndSchedule {
-    [self.view endEditing:YES];
-    if (self.eventField.text.length == 0) {
-        self.statusLabel.text = @"先填写演出名称。";
-        return;
-    }
-    if ([self.salePicker.date timeIntervalSinceNow] <= 0) {
-        self.statusLabel.text = @"开售时间必须晚于当前时间。";
-        return;
-    }
-    NSString *link = [self.linkField.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-    if (link.length > 0 && ![self isOfficialDamaiURLString:link]) {
-        self.statusLabel.text = @"链接必须是大麦官方 damai.cn 的 HTTPS 地址。";
-        return;
-    }
-
-    [NSUserDefaults.standardUserDefaults setObject:[self currentPlan] forKey:@"DPTSavedPlan"];
-    self.statusLabel.text = @"计划已保存在本机，正在申请通知权限……";
-    [self scheduleLocalNotifications];
-    [self updateCountdown];
-}
-
-- (void)scheduleLocalNotifications {
-    UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
-    [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge)
-                          completionHandler:^(BOOL granted, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (!granted || error) {
-                self.statusLabel.text = @"计划已保存；通知权限未开启，请在系统设置中允许通知。";
-                return;
-            }
-            [center getPendingNotificationRequestsWithCompletionHandler:^(NSArray<UNNotificationRequest *> *requests) {
-                NSMutableArray<NSString *> *oldIDs = [NSMutableArray array];
-                for (UNNotificationRequest *request in requests) {
-                    if ([request.identifier hasPrefix:@"DamaiPocket."]) [oldIDs addObject:request.identifier];
-                }
-                [center removePendingNotificationRequestsWithIdentifiers:oldIDs];
-
-                NSDate *saleDate = self.salePicker.date;
-                NSArray<NSNumber *> *offsets = @[@600, @60, @0];
-                NSArray<NSString *> *labels = @[@"10 分钟后开售", @"1 分钟后开售", @"现在开售"];
-                for (NSUInteger i = 0; i < offsets.count; i++) {
-                    NSDate *fireDate = [saleDate dateByAddingTimeInterval:-offsets[i].doubleValue];
-                    if ([fireDate timeIntervalSinceNow] <= 0) continue;
-                    UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
-                    content.title = [NSString stringWithFormat:@"DamaiPocket · %@", labels[i]];
-                    NSString *event = self.eventField.text ?: @"演出";
-                    NSString *session = self.sessionField.text ?: @"";
-                    content.body = session.length ? [NSString stringWithFormat:@"%@ · %@", event, session] : event;
-                    content.sound = UNNotificationSound.defaultSound;
-                    NSDateComponents *components = [[NSCalendar currentCalendar] components:
-                        (NSCalendarUnitYear | NSCalendarUnitMonth | NSCalendarUnitDay |
-                         NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond)
-                        fromDate:fireDate];
-                    UNCalendarNotificationTrigger *trigger =
-                        [UNCalendarNotificationTrigger triggerWithDateMatchingComponents:components repeats:NO];
-                    NSString *identifier = [NSString stringWithFormat:@"DamaiPocket.%lu", (unsigned long)i];
-                    UNNotificationRequest *request = [UNNotificationRequest requestWithIdentifier:identifier
-                                                                                           content:content
-                                                                                           trigger:trigger];
-                    [center addNotificationRequest:request withCompletionHandler:nil];
-                }
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    self.statusLabel.text = @"已保存，并安排开售前 10 分钟、1 分钟及开售时的本地提醒。";
-                });
-            }];
-        });
-    }];
-}
-
-- (BOOL)isOfficialDamaiURLString:(NSString *)value {
-    NSURLComponents *components = [NSURLComponents componentsWithString:value];
-    NSString *scheme = components.scheme.lowercaseString;
-    NSString *host = components.host.lowercaseString;
-    if (![scheme isEqualToString:@"https"] || host.length == 0) return NO;
-    return [host isEqualToString:@"damai.cn"] || [host hasSuffix:@".damai.cn"];
-}
-
-- (void)openDamai {
-    [self.view endEditing:YES];
-    NSString *value = [self.linkField.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
-    NSURL *url = nil;
-    if (value.length == 0) {
-        url = [NSURL URLWithString:@"https://www.damai.cn/"];
-    } else if ([self isOfficialDamaiURLString:value]) {
-        url = [NSURL URLWithString:value];
-    } else {
-        self.statusLabel.text = @"请先填写有效的大麦官方 HTTPS 链接。";
-        return;
-    }
-    [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:^(BOOL success) {
-        self.statusLabel.text = success ? @"已打开大麦官方页面；请在官方 App 内完成购票。" : @"无法打开链接，请检查大麦 App 或网络。";
-    }];
-}
-
-- (void)updateCountdown {
-    if (!self.isViewLoaded || !self.countdownLabel) return;
-    NSTimeInterval remaining = [self.salePicker.date timeIntervalSinceNow];
-    if (remaining <= 0) {
-        self.countdownLabel.text = @"开售时间已到";
-        return;
-    }
-    NSInteger seconds = (NSInteger)remaining;
-    NSInteger days = seconds / 86400;
-    NSInteger hours = (seconds % 86400) / 3600;
-    NSInteger minutes = (seconds % 3600) / 60;
-    NSInteger rest = seconds % 60;
-    if (days > 0) {
-        self.countdownLabel.text = [NSString stringWithFormat:@"距离开售：%ld 天 %02ld:%02ld:%02ld",
-                                    (long)days, (long)hours, (long)minutes, (long)rest];
-    } else {
-        self.countdownLabel.text = [NSString stringWithFormat:@"距离开售：%02ld:%02ld:%02ld",
-                                    (long)hours, (long)minutes, (long)rest];
-    }
-}
-
+- (void)dealloc { [self.timer invalidate]; }
 @end
