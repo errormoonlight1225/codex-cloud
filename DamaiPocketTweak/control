@@ -1,8 +1,8 @@
 Package: com.damaipocket.tweak
 Name: DamaiPocket
-Version: 0.2.0
+Version: 1.0.0
 Architecture: iphoneos-arm
-Description: Rootless on-device UI assistant for the official Damai app.
+Description: In-app ticket workflow assistant for Damai (Dopamine rootless)
 Maintainer: DamaiPocket contributors
 Author: DamaiPocket contributors
 Section: Tweaks
