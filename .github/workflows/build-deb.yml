@@ -13,25 +13,28 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install build tools
-        run: brew install ldid dpkg
-
-      - name: Install Theos
+      - name: Install host dependencies
         run: |
-          git clone --depth 1 --recursive https://github.com/theos/theos.git "$HOME/theos"
+          sudo apt-get update
+          sudo apt-get install -y xz-utils libxml2-dev libtinfo6 libio-compress-lzma-perl
+
+      - name: Install Theos and iOS toolchain
+        run: |
+          env THEOS="$HOME/theos" CI=true bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+          echo "$HOME/theos/toolchain/linux/iphone/bin" >> "$GITHUB_PATH"
 
       - name: Install iPhoneOS 16.5 SDK
         run: |
-          git clone --depth 1 https://github.com/theos/sdks.git "$RUNNER_TEMP/theos-sdks"
-          test -d "$RUNNER_TEMP/theos-sdks/iPhoneOS16.5.sdk"
           mkdir -p "$HOME/theos/sdks"
-          cp -R "$RUNNER_TEMP/theos-sdks/iPhoneOS16.5.sdk" "$HOME/theos/sdks/"
+          curl -fL --retry 3 https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz -o "$RUNNER_TEMP/iPhoneOS16.5.sdk.tar.xz"
+          tar -xJf "$RUNNER_TEMP/iPhoneOS16.5.sdk.tar.xz" -C "$HOME/theos/sdks"
+          test -d "$HOME/theos/sdks/iPhoneOS16.5.sdk"
 
       - name: Build rootless tweak
         working-directory: DamaiPocketTweak
