@@ -1,11 +1,11 @@
-name: Build DamaiPocket Rootless App
+name: Build DamaiPocket Dopamine Tweak
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - "DamaiPocketApp/**"
+      - "DamaiPocketTweak/**"
       - ".github/workflows/build-deb.yml"
 
 permissions:
@@ -33,26 +33,27 @@ jobs:
           mkdir -p "$HOME/theos/sdks"
           cp -R "$RUNNER_TEMP/theos-sdks/iPhoneOS16.5.sdk" "$HOME/theos/sdks/"
 
-      - name: Build rootless app package
-        working-directory: DamaiPocketApp
+      - name: Build rootless tweak
+        working-directory: DamaiPocketTweak
         run: |
           export THEOS="$HOME/theos"
-          chmod +x after-install
           make clean
           make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
 
-      - name: Verify DEB and app bundle
+      - name: Verify rootless package
         run: |
-          set -e
-          DEB="$(find DamaiPocketApp/packages -maxdepth 1 -name '*.deb' -print -quit)"
+          set -euo pipefail
+          DEB="$(find DamaiPocketTweak/packages -maxdepth 1 -name '*.deb' -print -quit)"
           test -n "$DEB"
           dpkg-deb -I "$DEB"
-          dpkg-deb -c "$DEB" | grep -E 'DamaiPocket\.app/(Info\.plist|DamaiPocket)$'
+          dpkg-deb -c "$DEB" | tee package-files.txt
+          grep -E 'var/jb/Library/MobileSubstrate/DynamicLibraries/DamaiPocket\.dylib' package-files.txt
+          grep -E 'var/jb/Library/MobileSubstrate/DynamicLibraries/DamaiPocket\.plist' package-files.txt
 
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DamaiPocket-Rootless-DEB
-          path: DamaiPocketApp/packages/*.deb
+          name: DamaiPocket-Dopamine-DEB
+          path: DamaiPocketTweak/packages/*.deb
           if-no-files-found: error
           retention-days: 30
