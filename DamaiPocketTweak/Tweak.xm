@@ -5,7 +5,7 @@
 static NSString *const DPBundle = @"cn.damai.iphone";
 static NSInteger const DPTag = 0x44504B54;
 static NSTimer *DPTimer;
-static BOOL DPRunning, DPSubmitOK, DPSubmitted, DPPayTapped;
+static BOOL DPRunning, DPSubmitOK, DPConfirmed, DPSubmitted, DPPayTapped;
 static NSInteger DPStep = 0, DPWant = 1;
 static CFTimeInterval DPLastTap = 0;
 static NSString *DPSession = @"", *DPPrice = @"", *DPStatus = @"待命：在大麦页面点右侧 DP";
@@ -136,7 +136,7 @@ static void DPStart(NSString *session, NSString *price, NSInteger quantity) {
     DPWant=MAX(1,MIN(6,quantity));
     NSUserDefaults *d=NSUserDefaults.standardUserDefaults;
     [d setObject:DPSession forKey:@"dp.session"];[d setObject:DPPrice forKey:@"dp.price"];[d setInteger:DPWant forKey:@"dp.quantity"];
-    DPStep=0;DPLastTap=0;DPSubmitOK=YES;DPSubmitted=NO;DPPayTapped=NO;DPRunning=YES;
+    DPStep=0;DPLastTap=0;DPSubmitOK=YES;DPConfirmed=NO;DPSubmitted=NO;DPPayTapped=NO;DPRunning=YES;
     DPStatus=@"运行中：只识别并操作大麦当前可见 UI；验证、排队、风控出现即停止。";
     [DPTimer invalidate];DPTimer=[NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(__unused NSTimer *t){DPScan();}];DPScan();
 }
@@ -160,7 +160,8 @@ static void DPScan(void) {
     if(DPSession.length && DPStep<1 && [all containsString:DPSession] && DPTap(nodes,DPSession,@"已选择目标场次")){DPStep=1;return;}
     if(DPPrice.length && DPStep<2 && [all containsString:DPPrice] && DPTap(nodes,DPPrice,@"已选择目标票档")){DPStep=2;return;}
     if(DPStep==2){if(DPQuantity(nodes)){DPStep=3;DPStatus=[NSString stringWithFormat:@"数量已设为%ld，等待确认订单。",(long)DPWant];}return;}
-    if(DPStep>=3 && DPTap(nodes,@"确认订单",@"已点击确认订单，等待订单审核页…"))return;
+    if(DPStep>=3 && !DPConfirmed && DPTap(nodes,@"确认订单",@"已点击确认订单，等待订单审核页…")){DPConfirmed=YES;return;}
+    if(DPConfirmed && DPFind(nodes,@"确认订单")){DPStatus=@"已点击确认订单，等待大麦页面切换…";return;}
     if(DPTap(nodes,@"立即购买",@"已进入购票选择页…"))return;
     if(DPTap(nodes,@"立即预订",@"已进入预订页…"))return;
     if(DPTap(nodes,@"选座购买",@"遇到选座流程，已停止自动操作。")){DPStop(@"该场次需要选座；请手动完成后再操作。");return;}
