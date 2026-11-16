@@ -16,6 +16,7 @@ static NSString *DPSession = @"", *DPPrice = @"", *DPStatus = @"待命：在大�
 @end
 @implementation DPNode @end
 
+// UI-only automation: it never calls Damai order APIs or reads payment credentials.
 static BOOL DPIsDamai(void) { return [NSBundle.mainBundle.bundleIdentifier isEqualToString:DPBundle]; }
 static NSString *DPText(UIView *v) {
     NSMutableArray *a = [NSMutableArray array];
@@ -84,8 +85,13 @@ static BOOL DPTapView(UIView *v) {
     return NO;
 }
 static BOOL DPTap(NSArray *nodes, NSString *word, NSString *status) {
-    DPNode *n=DPFind(nodes,word); if (!n || !DPTapView(n.view)) return NO;
-    DPLastTap=CACurrentMediaTime(); DPStatus=status; return YES;
+    for (DPNode *n in nodes) {
+        if ([n.text rangeOfString:word options:NSCaseInsensitiveSearch].location==NSNotFound) continue;
+        if (DPTapView(n.view)) {
+            DPLastTap=CACurrentMediaTime(); DPStatus=status; return YES;
+        }
+    }
+    return NO;
 }
 static BOOL DPHasLabel(UIView *v, NSString *needle) {
     if ([v.accessibilityLabel containsString:needle]) return YES;
