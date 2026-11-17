@@ -8,7 +8,7 @@ static NSTimer *DPTimer;
 static BOOL DPRunning, DPSubmitOK, DPConfirmed, DPSubmitted, DPPayTapped;
 static NSInteger DPStep = 0, DPWant = 1;
 static CFTimeInterval DPLastTap = 0;
-static NSString *DPSession = @"", *DPPrice = @"", *DPStatus = @"待命：在大麦页面点右侧 DP";
+static NSString *DPSession = @"", *DPPrice = @"", *DPStatus = @"待命：打开大麦目标页面，点右侧“识别”。";
 
 @interface DPNode : NSObject
 @property(nonatomic,strong) UIView *view;
@@ -235,7 +235,7 @@ static void DPScan(void) {
         UIButton *b=[UIButton buttonWithType:UIButtonTypeSystem];b.tag=DPTag;
         b.frame=CGRectMake(MAX(8,self.view.bounds.size.width-66),self.view.safeAreaInsets.top+72,58,42);
         b.autoresizingMask=UIViewAutoresizingFlexibleLeftMargin;b.backgroundColor=[UIColor colorWithRed:.88 green:.16 blue:.20 alpha:.95];
-        b.layer.cornerRadius=12;[b setTitle:@"DP" forState:UIControlStateNormal];[b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        b.layer.cornerRadius=12;[b setTitle:@"识别" forState:UIControlStateNormal];[b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
         b.titleLabel.font=[UIFont boldSystemFontOfSize:16];[b addTarget:self action:@selector(dp_openPanel) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:b];
     });
 }
