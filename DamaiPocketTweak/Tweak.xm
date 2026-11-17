@@ -125,6 +125,7 @@ static BOOL DPQuantity(NSArray *nodes) {
     if(DPTapView(button)){DPLastTap=CACurrentMediaTime();DPStatus=[NSString stringWithFormat:@"正在设置数量：%ld / %ld",(long)now,(long)DPWant];}
     return NO;
 }
+static void DPStart(NSString *session, NSString *price, NSInteger quantity);
 static NSArray *DPCandidates(NSArray *nodes, NSString *pattern) {
     NSError *error=nil;
     NSRegularExpression *re=[NSRegularExpression regularExpressionWithPattern:pattern options:NSRegularExpressionCaseInsensitive error:&error];
