@@ -156,7 +156,7 @@ static void DPStart(NSString *session, NSString *price, NSInteger quantity) {
 static void DPScan(void) {
     if(!DPRunning || !DPIsDamai() || CACurrentMediaTime()-DPLastTap<1.15)return;
     NSArray *nodes=DPNodes();NSString *all=DPAll(nodes);if(!all.length)return;
-    for(NSString *word in @[@"验证码",@"滑块",@"安全验证",@"人机验证",@"风险验证",@"访问过于频繁",@"操作太频繁",@"异常访问",@"请求频繁",@"排队中",@"请稍后重试"])
+    for(NSString *word in @[@"验证码",@"滑块",@"安全验证",@"人机验证",@"风险验证",@"访问过于频繁",@"操作太频繁",@"异常访问",@"请求频繁",@"排队",@"前方等待",@"系统繁忙",@"暂不可购买",@"请稍后重试"])
         if([all containsString:word]){DPStop([NSString stringWithFormat:@"检测到%@，已停止；请在官方界面手动处理。",word]);return;}
     if([all containsString:@"请先登录"] || [all containsString:@"立即登录"]){DPStop(@"请先登录大麦，再重新开始。");return;}
     if([all containsString:@"支付宝安全支付"] || [all containsString:@"支付宝收银台"] || [all containsString:@"输入支付密码"] || [all containsString:@"确认付款"]){DPStop(@"已到付款页面：核对金额后由你手动输入支付宝密码。不会读取或代填密码。");return;}
@@ -176,8 +176,8 @@ static void DPScan(void) {
     if(DPSession.length && DPStep<1 && [all containsString:DPSession] && DPTap(nodes,DPSession,@"已选择目标场次")){DPStep=1;return;}
     if(DPPrice.length && DPStep<2 && [all containsString:DPPrice] && DPTap(nodes,DPPrice,@"已选择目标票档")){DPStep=2;return;}
     if(DPStep==2){if(DPQuantity(nodes)){DPStep=3;DPStatus=[NSString stringWithFormat:@"数量已设为%ld，等待确认订单。",(long)DPWant];}return;}
-    if(DPTap(nodes,@"立即购买",@"已进入购票选择页…"))return;
-    if(DPTap(nodes,@"立即预订",@"已进入预订页…"))return;
+    if(DPStep==0 && DPTap(nodes,@"立即购买",@"已进入购票选择页…"))return;
+    if(DPStep==0 && DPTap(nodes,@"立即预订",@"已进入预订页…"))return;
     DPStatus=@"运行中：等待匹配场次/票档或大麦页面更新。";
 }
 
