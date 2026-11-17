@@ -166,7 +166,23 @@ static void DPScan(void) {
         if([all containsString:word]){DPStop(@"检测到选座流程，已停止；请手动选座。");return;}
     }
     if([all containsString:@"提交订单"] || [all containsString:@"确认订单"] || [all containsString:@"订单确认"]) {
-        DPStop(@"已到订单确认环节。请自行核对演出、场次、票档、数量、实名观演人和金额，再由你手动提交订单。"); return;
+        // Auto-submit only after the target session, price, and requested quantity were selected.
+        // The tap is limited to a visible UIKit control; never submit through private APIs.
+        if(DPStep>=3 && DPSession.length && DPPrice.length &&
+           [all containsString:DPSession] && [all containsString:DPPrice]) {
+            if(DPTap(nodes,@"提交订单",@"已自动点击“提交订单”；正在等待大麦跳转付款页。")) {
+                DPStop(@"订单已自动提交。请核对订单金额，并自行完成付款；不会代填支付密码。");
+                return;
+            }
+            if(DPTap(nodes,@"确认订单",@"已自动点击“确认订单”；正在等待大麦跳转付款页。")) {
+                DPStop(@"订单已自动提交。请核对订单金额，并自行完成付款；不会代填支付密码。");
+                return;
+            }
+            DPStop(@"已到订单确认页，但未找到明确可点击的提交按钮；为避免误操作已停止。");
+            return;
+        }
+        DPStop(@"已到订单确认页，但目标场次、票档或数量尚未全部确认；为避免误提交已停止。");
+        return;
     }
     if([all containsString:@"立即支付"] || [all containsString:@"去支付"] ||
        [all containsString:@"支付宝安全支付"] || [all containsString:@"支付宝收银台"] ||
