@@ -125,6 +125,38 @@ static BOOL DPQuantity(NSArray *nodes) {
     if(DPTapView(button)){DPLastTap=CACurrentMediaTime();DPStatus=[NSString stringWithFormat:@"正在设置数量：%ld / %ld",(long)now,(long)DPWant];}
     return NO;
 }
+static NSArray *DPCandidates(NSArray *nodes, NSString *pattern) {
+    NSError *error=nil;
+    NSRegularExpression *re=[NSRegularExpression regularExpressionWithPattern:pattern options:NSRegularExpressionCaseInsensitive error:&error];
+    if(!re || error)return @[];
+    NSMutableOrderedSet *found=[NSMutableOrderedSet orderedSet];
+    for(DPNode *n in nodes) {
+        NSString *s=n.text ?: @"";
+        for(NSTextCheckingResult *m in [re matchesInString:s options:0 range:NSMakeRange(0,s.length)]) {
+            NSString *v=[[s substringWithRange:m.range] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+            if(v.length)[found addObject:v];
+        }
+    }
+    return found.array;
+}
+static NSString *DPRecognizeAndStart(NSInteger quantity) {
+    NSArray *nodes=DPNodes();
+    NSString *all=DPAll(nodes);
+    if(!all.length)return @"没有读取到当前页面文字。请先打开大麦演出详情或票档页面，再点悬浮窗“识别”。";
+    BOOL damaiPage=NO;
+    for(NSString *word in @[@"演出",@"场次",@"票档",@"立即购买",@"立即预订",@"选座购买",@"选择场次"])
+        if([all containsString:word]){damaiPage=YES;break;}
+    if(!damaiPage)return @"当前页面不像大麦购票页面。请先打开目标演出页面，再点“识别”。";
+    NSArray *sessions=DPCandidates(nodes,@"(?:20\\d{2}[年./-])?\\d{1,2}(?:月|[./-])\\d{1,2}日?\\s*(?:周[一二三四五六日天]\\s*)?\\d{1,2}:\\d{2}");
+    NSArray *prices=DPCandidates(nodes,@"(?:¥|￥)\\s*\\d{2,6}(?:\\.\\d{1,2})?\\s*元?|\\d{2,6}(?:\\.\\d{1,2})?\\s*元");
+    if(sessions.count!=1 || prices.count!=1) {
+        DPStatus=[NSString stringWithFormat:@"识别到%lu个场次候选、%lu个票价候选；为避免误选，不会猜测。请在大麦页面进入唯一目标场次和票档后，再点“识别”。",(unsigned long)sessions.count,(unsigned long)prices.count];
+        return DPStatus;
+    }
+    DPStart(sessions.firstObject,prices.firstObject,MAX(1,MIN(6,quantity)));
+    return [NSString stringWithFormat:@"识别成功\\n场次：%@\\n票档：%@\\n数量：%ld张\\n已开始按当前页面识别结果推进；遇到验证码、排队、风控或选座会停止。",DPSession,DPPrice,(long)DPWant];
+}
+
 static void DPStop(NSString *reason) {
     void(^b)(void)=^{DPRunning=NO;DPSubmitOK=NO;[DPTimer invalidate];DPTimer=nil;DPStatus=reason?:@"已停止";};
     if(NSThread.isMainThread)b();else dispatch_async(dispatch_get_main_queue(),b);
@@ -174,19 +206,21 @@ static void DPScan(void) {
 @implementation UIViewController (DamaiPocket)
 - (void)dp_openPanel {
     if(!DPIsDamai() || self.presentedViewController)return;
-    NSUserDefaults *d=NSUserDefaults.standardUserDefaults;
-    UIAlertController *a=[UIAlertController alertControllerWithTitle:@"DamaiPocket · 抢票助手"
-        message:[NSString stringWithFormat:@"%@\n\n填写与页面完全一致的场次、票档文字。请先登录，并亲自勾选购票须知。",DPStatus]
+    UIAlertController *a=[UIAlertController alertControllerWithTitle:@"DamaiPocket · 页面识别"
+        message:[NSString stringWithFormat:@"%@\n\n无需手动填写场次。打开目标演出/票档页面后，点“识别当前页面”即可。数量默认1张。",DPStatus]
         preferredStyle:UIAlertControllerStyleAlert];
-    [a addTextFieldWithConfigurationHandler:^(UITextField *f){f.placeholder=@"场次关键词，例如 11月20日 19:30";f.text=[d stringForKey:@"dp.session"]?:DPSession;}];
-    [a addTextFieldWithConfigurationHandler:^(UITextField *f){f.placeholder=@"票档关键词，例如 680元";f.text=[d stringForKey:@"dp.price"]?:DPPrice;}];
-    [a addTextFieldWithConfigurationHandler:^(UITextField *f){f.placeholder=@"数量 1–6";NSInteger q=[d integerForKey:@"dp.quantity"];f.text=[NSString stringWithFormat:@"%ld",(long)(q?:1)];f.keyboardType=UIKeyboardTypeNumberPad;}];
-    [a addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+    [a addTextFieldWithConfigurationHandler:^(UITextField *f){f.placeholder=@"购买数量（1–6，默认1）";f.text=@"1";f.keyboardType=UIKeyboardTypeNumberPad;}];
+    [a addAction:[UIAlertAction actionWithTitle:@"关闭" style:UIAlertActionStyleCancel handler:nil]];
     [a addAction:[UIAlertAction actionWithTitle:@"停止" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *x){DPStop(@"已手动停止。");}]];
-    [a addAction:[UIAlertAction actionWithTitle:@"开始自动操作" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *x){
-        NSInteger q=a.textFields[2].text.integerValue;
-        if(!a.textFields[0].text.length || !a.textFields[1].text.length || q<1 || q>6){DPStatus=@"配置无效：填写场次、票档，数量 1–6。";return;}
-        DPStart(a.textFields[0].text,a.textFields[1].text,q);
+    [a addAction:[UIAlertAction actionWithTitle:@"识别当前页面" style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *x){
+        NSInteger q=a.textFields.firstObject.text.integerValue;
+        if(q<1 || q>6)q=1;
+        NSString *result=DPRecognizeAndStart(q);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            UIAlertController *r=[UIAlertController alertControllerWithTitle:(DPRunning?@"识别成功":@"识别未完成") message:result preferredStyle:UIAlertControllerStyleAlert];
+            [r addAction:[UIAlertAction actionWithTitle:@"知道了" style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:r animated:YES completion:nil];
+        });
     }]];
     [self presentViewController:a animated:YES completion:nil];
 }
@@ -199,7 +233,7 @@ static void DPScan(void) {
     dispatch_async(dispatch_get_main_queue(),^{
         if(!self.isViewLoaded || !self.view.window || [self.view viewWithTag:DPTag])return;
         UIButton *b=[UIButton buttonWithType:UIButtonTypeSystem];b.tag=DPTag;
-        b.frame=CGRectMake(MAX(8,self.view.bounds.size.width-58),self.view.safeAreaInsets.top+72,48,42);
+        b.frame=CGRectMake(MAX(8,self.view.bounds.size.width-66),self.view.safeAreaInsets.top+72,58,42);
         b.autoresizingMask=UIViewAutoresizingFlexibleLeftMargin;b.backgroundColor=[UIColor colorWithRed:.88 green:.16 blue:.20 alpha:.95];
         b.layer.cornerRadius=12;[b setTitle:@"DP" forState:UIControlStateNormal];[b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
         b.titleLabel.font=[UIFont boldSystemFontOfSize:16];[b addTarget:self action:@selector(dp_openPanel) forControlEvents:UIControlEventTouchUpInside];[self.view addSubview:b];
