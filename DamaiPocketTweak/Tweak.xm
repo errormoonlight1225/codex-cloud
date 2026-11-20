@@ -5,9 +5,9 @@
 static NSString *const DPBundle = @"cn.damai.iphone";
 static NSInteger const DPTag = 0x44504B54;
 static NSTimer *DPTimer;
-static BOOL DPRunning;
+static BOOL DPRunning, DPSubmitTapped;
 static NSInteger DPStep = 0, DPWant = 1;
-static CFTimeInterval DPLastTap = 0;
+static CFTimeInterval DPLastTap = 0, DPSubmitTapTime = 0;
 static NSString *DPSession = @"", *DPPrice = @"", *DPStatus = @"待命：打开大麦目标页面，点右侧“识别”。";
 
 @interface DPNode : NSObject
@@ -149,7 +149,7 @@ static void DPStart(NSString *session, NSString *price, NSInteger quantity) {
     DPWant=MAX(1,MIN(6,quantity));
     NSUserDefaults *d=NSUserDefaults.standardUserDefaults;
     [d setObject:DPSession forKey:@"dp.session"];[d setObject:DPPrice forKey:@"dp.price"];[d setInteger:DPWant forKey:@"dp.quantity"];
-    DPStep=0;DPLastTap=0;DPRunning=YES;
+    DPStep=0;DPLastTap=0;DPSubmitTapped=NO;DPSubmitTapTime=0;DPRunning=YES;
     DPStatus=@"运行中：只识别并操作大麦当前可见 UI；验证、排队、风控出现即停止。";
     [DPTimer invalidate];DPTimer=[NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(__unused NSTimer *t){DPScan();}];DPScan();
 }
@@ -159,26 +159,33 @@ static void DPScan(void) {
     for(NSString *word in @[@"验证码",@"滑块",@"安全验证",@"人机验证",@"风险验证",@"访问过于频繁",@"操作太频繁",@"异常访问",@"请求频繁",@"排队",@"前方等待",@"系统繁忙",@"暂不可购买",@"请稍后重试"])
         if([all containsString:word]){DPStop([NSString stringWithFormat:@"检测到%@，已停止；请在官方界面手动处理。",word]);return;}
     if([all containsString:@"请先登录"] || [all containsString:@"立即登录"]){DPStop(@"请先登录大麦，再重新开始。");return;}
-    if([all containsString:@"支付宝安全支付"] || [all containsString:@"支付宝收银台"] || [all containsString:@"输入支付密码"] || [all containsString:@"确认付款"]){DPStop(@"已到付款页面：核对金额后由你手动输入支付宝密码。不会读取或代填密码。");return;}
+    if([all containsString:@"支付宝安全支付"] || [all containsString:@"支付宝收银台"] || [all containsString:@"输入支付密码"] || [all containsString:@"确认付款"]){DPStop(DPSubmitTapped?@"已检测到提交订单后的付款页面：请核对场次、票档、数量和金额，再由你手动输入支付宝密码。不会读取或代填密码。":@"已到付款页面：核对金额后由你手动输入支付宝密码。不会读取或代填密码。");return;}
 
     // Stop before seat maps, order confirmation/submission, and all payment screens.
     for(NSString *word in @[@"选座",@"座位图",@"选择座位",@"请选座",@"区域图"]) {
         if([all containsString:word]){DPStop(@"检测到选座流程，已停止；请手动选座。");return;}
     }
     if([all containsString:@"提交订单"] || [all containsString:@"确认订单"] || [all containsString:@"订单确认"]) {
-        // Auto-submit only after the target session, price, and requested quantity were selected.
-        // The tap is limited to a visible UIKit control; never submit through private APIs.
+        // A submit tap is one-shot. Never tap again if the result is delayed or ambiguous.
+        if(DPSubmitTapped) {
+            if(CACurrentMediaTime()-DPSubmitTapTime>8.0)
+                DPStop(@"已点击提交订单，但8秒内页面未明确跳转到付款页；为避免重复下单已停止，请手动检查大麦订单。");
+            else
+                DPStatus=@"已点击提交订单，正在等待付款页确认；不会重复点击。";
+            return;
+        }
+        // Only submit after the selected show, price and quantity steps are complete.
         if(DPStep>=3 && DPSession.length && DPPrice.length &&
            [all containsString:DPSession] && [all containsString:DPPrice]) {
-            if(DPTap(nodes,@"提交订单",@"已自动点击“提交订单”；正在等待大麦跳转付款页。")) {
-                DPStop(@"订单已自动提交。请核对订单金额，并自行完成付款；不会代填支付密码。");
-                return;
+            BOOL tapped=DPTap(nodes,@"提交订单",@"已点击“提交订单”；等待页面确认。");
+            if(!tapped)tapped=DPTap(nodes,@"确认订单",@"已点击“确认订单”；等待页面确认。");
+            if(tapped) {
+                DPSubmitTapped=YES;
+                DPSubmitTapTime=CACurrentMediaTime();
+                DPStatus=@"已点击订单提交按钮，等待大麦跳转付款页；不会重复点击。";
+            } else {
+                DPStop(@"已到订单确认页，但未找到明确可点击的提交按钮；为避免误操作已停止。");
             }
-            if(DPTap(nodes,@"确认订单",@"已自动点击“确认订单”；正在等待大麦跳转付款页。")) {
-                DPStop(@"订单已自动提交。请核对订单金额，并自行完成付款；不会代填支付密码。");
-                return;
-            }
-            DPStop(@"已到订单确认页，但未找到明确可点击的提交按钮；为避免误操作已停止。");
             return;
         }
         DPStop(@"已到订单确认页，但目标场次、票档或数量尚未全部确认；为避免误提交已停止。");
