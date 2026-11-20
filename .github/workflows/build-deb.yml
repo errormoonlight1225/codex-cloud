@@ -23,20 +23,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xz-utils libxml2-dev libtinfo6 libio-compress-lzma-perl libplist-2.0-4
 
-      - name: Install iPhoneOS 16.5 SDK
+      - name: Install Theos, iOS toolchain, and SDK
         run: |
-          mkdir -p "$HOME/theos/sdks"
+          set -euo pipefail
+          export THEOS="$HOME/theos"
+          # Install into a clean directory; the upstream installer mistakes an
+          # SDK-only directory for an existing Theos checkout.
+          git clone --recursive https://github.com/theos/theos.git "$THEOS"
+          mkdir -p "$THEOS/toolchain" "$THEOS/sdks"
+          curl -fL --retry 3 https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz -o "$RUNNER_TEMP/iOSToolchain.tar.xz"
+          tar -xJf "$RUNNER_TEMP/iOSToolchain.tar.xz" -C "$THEOS/toolchain"
           curl -fL --retry 3 https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz -o "$RUNNER_TEMP/iPhoneOS16.5.sdk.tar.xz"
-          tar -xJf "$RUNNER_TEMP/iPhoneOS16.5.sdk.tar.xz" -C "$HOME/theos/sdks"
-          test -d "$HOME/theos/sdks/iPhoneOS16.5.sdk"
-
-      - name: Install Theos and iOS toolchain
-        run: |
-          # The installer checks for an existing SDK; preinstall it above to
-          # avoid its separate GitHub API lookup for the latest SDK.
-          env THEOS="$HOME/theos" CI=true bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
-          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
-          echo "$HOME/theos/toolchain/linux/iphone/bin" >> "$GITHUB_PATH"
+          tar -xJf "$RUNNER_TEMP/iPhoneOS16.5.sdk.tar.xz" -C "$THEOS/sdks"
+          test -x "$THEOS/toolchain/linux/iphone/bin/clang"
+          test -d "$THEOS/sdks/iPhoneOS16.5.sdk"
+          echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+          echo "$THEOS/toolchain/linux/iphone/bin" >> "$GITHUB_PATH"
 
       - name: Build rootless tweak
         working-directory: DamaiPocketTweak
