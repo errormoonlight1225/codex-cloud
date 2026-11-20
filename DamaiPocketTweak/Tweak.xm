@@ -50,10 +50,6 @@ static NSString *DPAll(NSArray *nodes) {
     NSMutableArray *a=[NSMutableArray array]; for (DPNode *n in nodes) if(n.text.length)[a addObject:n.text];
     return [a componentsJoinedByString:@" | "];
 }
-static DPNode *DPFind(NSArray *nodes, NSString *needle) {
-    for (DPNode *n in nodes) if ([n.text rangeOfString:needle options:NSCaseInsensitiveSearch].location!=NSNotFound) return n;
-    return nil;
-}
 // Only activate explicit UIKit controls. Never invoke private gesture targets.
 static BOOL DPTapView(UIView *v) {
     for (NSInteger i=0; v && i<8; i++,v=v.superview) {
