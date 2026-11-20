@@ -34,16 +34,25 @@ static BOOL DPVisible(UIView *v, UIView *w) {
     CGRect r = [v convertRect:v.bounds toView:w];
     return !CGRectIsEmpty(r) && CGRectIntersectsRect(r, w.bounds);
 }
-static void DPWalk(UIView *v, UIView *w, NSMutableArray *out) {
-    if (!DPVisible(v,w)) return;
+static void DPWalk(UIView *v, UIView *w, NSMutableArray *out, NSUInteger depth, NSUInteger *visited) {
+    // A malformed/deep UIKit hierarchy must never cause unbounded recursion or stack growth.
+    if (depth > 32 || *visited >= 1500 || !DPVisible(v,w)) return;
+    (*visited)++;
     NSString *s = DPText(v);
     if (s.length) { DPNode *n=[DPNode new]; n.view=v; n.text=s; [out addObject:n]; }
-    for (UIView *c in v.subviews) DPWalk(c,w,out);
+    for (UIView *child in v.subviews) {
+        if (*visited >= 1500) break;
+        DPWalk(child,w,out,depth+1,visited);
+    }
 }
 static NSArray *DPNodes(void) {
     NSMutableArray *a=[NSMutableArray array];
-    for (UIWindow *w in UIApplication.sharedApplication.windows)
-        if (!w.hidden && w.alpha>.03 && w.rootViewController) DPWalk(w.rootViewController.view,w,a);
+    NSUInteger visited=0;
+    for (UIWindow *w in UIApplication.sharedApplication.windows) {
+        if (visited >= 1500) break;
+        if (!w.hidden && w.alpha>.03 && w.rootViewController)
+            DPWalk(w.rootViewController.view,w,a,0,&visited);
+    }
     return a;
 }
 static NSString *DPAll(NSArray *nodes) {
@@ -235,6 +244,9 @@ static void DPScan(void) {
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     if(!DPIsDamai() || [self isKindOfClass:UIAlertController.class])return;
+    // Install once on the app's root controller only; do not mutate every page controller.
+    UIWindow *keyWindow=UIApplication.sharedApplication.keyWindow;
+    if(keyWindow && self != keyWindow.rootViewController)return;
     dispatch_async(dispatch_get_main_queue(),^{
         if(!self.isViewLoaded || !self.view.window || [self.view viewWithTag:DPTag])return;
         UIButton *b=[UIButton buttonWithType:UIButtonTypeSystem];b.tag=DPTag;
