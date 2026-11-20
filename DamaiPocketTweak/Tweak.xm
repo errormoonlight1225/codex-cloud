@@ -154,6 +154,11 @@ static void DPStart(NSString *session, NSString *price, NSInteger quantity) {
     [DPTimer invalidate];DPTimer=[NSTimer scheduledTimerWithTimeInterval:1.0 repeats:YES block:^(__unused NSTimer *t){DPScan();}];DPScan();
 }
 static void DPScan(void) {
+    // UIKit hierarchy access must always run on the main thread.
+    if(!NSThread.isMainThread) {
+        dispatch_async(dispatch_get_main_queue(), ^{ DPScan(); });
+        return;
+    }
     if(!DPRunning || !DPIsDamai() || CACurrentMediaTime()-DPLastTap<1.15)return;
     NSArray *nodes=DPNodes();NSString *all=DPAll(nodes);if(!all.length)return;
     for(NSString *word in @[@"验证码",@"滑块",@"安全验证",@"人机验证",@"风险验证",@"访问过于频繁",@"操作太频繁",@"异常访问",@"请求频繁",@"排队",@"前方等待",@"系统繁忙",@"暂不可购买",@"请稍后重试"])
@@ -245,13 +250,5 @@ static void DPScan(void) {
 }
 %end
 
-%hook UIApplication
-- (void)openURL:(NSURL *)url options:(NSDictionary *)options completionHandler:(void (^)(BOOL))completionHandler {
-    if([@[@"alipay",@"alipays"] containsObject:url.scheme.lowercaseString])DPStop(@"已跳转支付宝；请核对金额并手动输入支付密码。");
-    %orig;
-}
-- (BOOL)openURL:(NSURL *)url {
-    if([@[@"alipay",@"alipays"] containsObject:url.scheme.lowercaseString])DPStop(@"已跳转支付宝；请核对金额并手动输入支付密码。");
-    return %orig;
-}
-%end
+// Deliberately do not hook UIApplication URL-opening methods. Payment handoff is
+// detected from the visible Damai UI; avoiding global URL hooks reduces app-wide risk.
